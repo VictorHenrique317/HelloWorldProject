@@ -1,7 +1,10 @@
 using System.Collections.Generic;
 using System;
+using ingredients;
+using storage;
 namespace hamburger{
     public abstract class Hamburger{
+        protected readonly object lockSync = new Object();
         protected double price;
         protected Bun bun;
         protected Meat meat;
@@ -32,12 +35,9 @@ namespace hamburger{
 
     public class HouseHamburger: Hamburger{
         public HouseHamburger(){
-            this.bun = Bun.Wheat; 
-            this.meat = Meat.Steak;
+            if (Storage.removeStock(Bun.Wheat, 1) != 0){ this.bun = Bun.Wheat; price += priceTable[this.bun];} 
+            if (Storage.removeStock(Meat.Steak, 1) != 0) { this.meat = Meat.Steak; price += priceTable[this.meat];}            
             this.additionals = new HashSet<Additionals>();
-            price += priceTable[this.bun];
-            price += priceTable[this.meat];
-
         }
 
         public override bool addAdditional(Additionals additional){
@@ -46,13 +46,20 @@ namespace hamburger{
                 return false;
             }
 
-            additionals.Add(additional);
-            if (additional == Additionals.DoubleMeat){
-                    price += priceTable[meat]; // add the meat price
-                }else{
-                    price += priceTable[additional];
+            if (additional == Additionals.DoubleMeat){ // Verifies for double meat
+                if(Storage.removeStock(this.meat, 1) != 0){ // there is meat on stock
+                    price += priceTable[meat]; // add the meat price     
+                    additionals.Add(additional);            
+                    return true;   
                 }
-            return true;   
+            }else{
+                if(Storage.removeStock(additional, 1) != 0){ // there is items on the stock
+                    price += priceTable[additional];
+                    additionals.Add(additional);
+                    return true;
+                }
+            }
+            return false;   
         }
 
         public override bool removeAdditional(Additionals additional){
@@ -62,11 +69,13 @@ namespace hamburger{
             }
 
             additionals.Remove(additional);
-             if (additional == Additionals.DoubleMeat){
-                    price -= priceTable[meat]; // subtract the meat price
-                }else{
-                    price -= priceTable[additional];
-                }
+            if (additional == Additionals.DoubleMeat){
+                price -= priceTable[meat]; // subtract the meat price
+                Storage.addStock(this.meat, 1);
+            }else{
+                price -= priceTable[additional];
+                Storage.addStock(additional, 1);
+            }
             return true; 
         }
 
